@@ -209,7 +209,7 @@ To do: For every published study, work out the planned sample size, then the pow
 replications <- literature |>
   filter(published) |>
   mutate(planned_n = map_dbl(d_hat, n_for_80),
-         actual_power = map_dbl(planned_n, \(n) pwr.t.test(n = n, d = ___)$power))
+         actual_power = map_dbl(planned_n, \(n) pwr.t.test(n = n, d = 0.3)$power))
 
 mean(replications$actual_power)
 ```
@@ -247,11 +247,30 @@ To do: Write this part yourself, following Part 3.
 ```{r}
 set.seed(4)
 
-# your code here
+pilots <- tibble(pilot = 1:2000) |>
+  mutate(result = map(pilot, \(i) simulate_study(n_per_group = 10, true_d = 0.4))) |>
+  unnest(result) |>
+  mutate(go = d_hat > 0.2)
 
+mean(!pilots$go) # share of pilots where you give up on a real effect
+
+followups <- pilots |>
+  filter(go) |>
+  mutate(planned_n = map_dbl(d_hat, n_for_80),
+         actual_power = map_dbl(planned_n, \(n) pwr.t.test(n = n, d = 0.4)$power))
+
+quantile(followups$planned_n, c(.1, .5, .9))
+mean(followups$actual_power)
 ```
 
 ```{r}
+followups |>
+  ggplot(aes(x = planned_n)) +
+  geom_histogram(bins = 40, fill = "steelblue") +
+  scale_x_log10() +
+  geom_vline(xintercept = n_for_80(0.4), linetype = "dashed") +
+  labs(x = "Planned n per group (log scale)", y = "Number of pilots",
+       title = "Dashed line: the sample you actually needed")
 ```
 
 To do: The sample you actually needed is `n_for_80(0.4)` per group. What did your pilots tell you to run instead? Would you trust an effect size from your 10-per-group pilot?
